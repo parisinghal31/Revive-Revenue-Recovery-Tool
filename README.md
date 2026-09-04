@@ -7,6 +7,10 @@
 ![API keys needed to verify every claim: zero](https://img.shields.io/badge/API%20keys%20to%20verify-zero-2ea44f?style=flat-square)
 ![Deterministic](https://img.shields.io/badge/headline%20%E2%82%B9-reproducible%20to%20the%20rupee-2ea44f?style=flat-square)
 
+[![Watch the Revive demo, 5 minutes](https://i.vimeocdn.com/filter/overlay?src0=https%3A%2F%2Fi.vimeocdn.com%2Fvideo%2F2197326592-ebedce84fad2ec338dcb38aaf4f201dd4f179048f2dec1650af903252a4fe3e0-d_1280x720%3Fregion%3Dus&src1=http%3A%2F%2Ff.vimeocdn.com%2Fp%2Fimages%2Fcrawler_play.png)](https://vimeo.com/1223978353)
+
+*[Watch the demo on Vimeo](https://vimeo.com/1223978353) (5:35).*
+
 Razorpay's native retry is time-based (T+1/T+2/T+3), regardless of **why** a payment failed. Retrying an expired card tomorrow is always wasted; calling a hesitant customer works. **Revive diagnoses the decline code first**, picks a bounded intervention (Hinglish voice call, WhatsApp UPI link, smart-timed retry, bank-outage hold, subscription save), runs it through five server-side guardrails, and measures the rupees it brings back. Every decision, check, and action is written to an audit trail *before* it executes.
 
 ```
