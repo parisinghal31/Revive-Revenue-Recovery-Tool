@@ -1,0 +1,25 @@
+# secrets — never commit
+Keys/
+backend/start.ps1
+.env
+.env.*
+
+# python
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+
+# node / next
+node_modules/
+frontend/.next/
+frontend/out/
+*.tsbuildinfo
+next-env.d.ts
+
+# misc
+.DS_Store
+research/
+CLAUDE.md
+AGENTS.md
