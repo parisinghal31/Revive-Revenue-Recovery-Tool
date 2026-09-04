@@ -7,7 +7,7 @@
 ![API keys needed to verify every claim: zero](https://img.shields.io/badge/API%20keys%20to%20verify-zero-2ea44f?style=flat-square)
 ![Deterministic](https://img.shields.io/badge/headline%20%E2%82%B9-reproducible%20to%20the%20rupee-2ea44f?style=flat-square)
 
-Razorpay's native retry is time-based — T+1/T+2/T+3 — regardless of **why** a payment failed. Retrying an expired card tomorrow is always wasted; calling a hesitant customer works. **Revive diagnoses the decline code first**, picks a bounded intervention (Hinglish voice call, WhatsApp UPI link, smart-timed retry, bank-outage hold, subscription save), runs it through five server-side guardrails, and measures the rupees it brings back — with every decision, check, and action written to an audit trail *before* it executes.
+Razorpay's native retry is time-based (T+1/T+2/T+3), regardless of **why** a payment failed. Retrying an expired card tomorrow is always wasted; calling a hesitant customer works. **Revive diagnoses the decline code first**, picks a bounded intervention (Hinglish voice call, WhatsApp UPI link, smart-timed retry, bank-outage hold, subscription save), runs it through five server-side guardrails, and measures the rupees it brings back. Every decision, check, and action is written to an audit trail *before* it executes.
 
 ```
 payment.failed ──► DECISION LAYER ──► GUARDRAILS ──► BOUNDED ACTION ──► ₹ RECOVERED
@@ -15,8 +15,6 @@ payment.failed ──► DECISION LAYER ──► GUARDRAILS ──► BOUNDED A
                    root cause →        audited BEFORE  retry / hold /      audited, and
                    intervention        any action      mandate-save        reproducible
 ```
-
----
 
 ## Judged on four things — here's each one, and where to check it
 
@@ -26,8 +24,6 @@ payment.failed ──► DECISION LAYER ──► GUARDRAILS ──► BOUNDED A
 | **Build quality** | 20 tests, green CI on every push, a headline number that reproduces to the rupee with **zero API keys**, a `/health` probe, and a one-click deploy blueprint. | [Verify in five minutes](#verify-this-repo-in-five-minutes-for-reviewers) |
 | **AI judgment** | "LLM proposes, rules dispose" — a bounded 5-action menu with a validator that rejects off-menu answers, **plus five places we deliberately refused to use a model**. | [Where we did *not* use AI](#where-we-deliberately-did-not-use-ai) |
 | **Failure recovery** | Both kinds: what the **system** does when a dependency dies, and what **we** did when the build broke — nine real incidents with root causes. | [What broke](#what-broke-and-what-we-did-about-it) |
-
----
 
 ## Measured on a batch, not a demo
 
@@ -65,11 +61,9 @@ cd ../frontend && npm install && npm run dev   # storefront http://localhost:300
 
 Everything degrades gracefully without keys: no LLM key → deterministic policy table (audited as such); no Razorpay key → simulated card picker; no Vapi/WhatsApp keys → decisions and audit rows still flow. CI (`.github/workflows/ci.yml`) runs the tests and the reproducible batch on every push.
 
----
-
 ## Tools & tech stack
 
-Every choice below is either free-tier or self-hosted, and each one is load-bearing — nothing is in this list for decoration.
+Every choice below is either free-tier or self-hosted, and each one is load-bearing.
 
 | Layer | Stack | Why this one |
 |---|---|---|
@@ -82,8 +76,6 @@ Every choice below is either free-tier or self-hosted, and each one is load-bear
 | **Payments** | ![Razorpay](https://img.shields.io/badge/Razorpay-0C2451?style=for-the-badge&logo=razorpay&logoColor=white) | Real test-mode Orders, Checkout, webhooks with HMAC verification, and order-payments reconciliation. |
 | **Messaging** | ![WhatsApp](https://img.shields.io/badge/WhatsApp%20Cloud%20API-25D366?style=for-the-badge&logo=whatsapp&logoColor=white) ![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white) | A provider chain, not a dependency — see [what broke](#what-broke-and-what-we-did-about-it). |
 | **Delivery** | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=black) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | CI runs the tests *and* the reproducible batch on every push; `render.yaml` deploys the backend with no secrets in the repo. |
-
----
 
 ## Architecture
 
@@ -142,14 +134,14 @@ flowchart LR
 
 Two decision paths, both audited with which one decided:
 
-1. **Live traffic** — the LLM (Groq `gpt-oss-120b`, or Gemini, via OpenAI-compatible endpoints) receives the failure context: decline code, amount, method, bank health, IST hour, and the customer's recent failure velocity. It must return JSON choosing **one of five menu actions** with a root cause, reasoning, and confidence. The reasoning streams to the dashboard's Agent Brain panel tagged with the model name.
-2. **Batch runs & keyless mode** — the deterministic policy table (`engine.py:DECISION_TABLE`) decides. Batches always use it, for reproducibility and honest measurement; the batch's first audit row discloses this.
+1. **Live traffic.** The LLM (Groq `gpt-oss-120b`, or Gemini, via OpenAI-compatible endpoints) receives the failure context: decline code, amount, method, bank health, IST hour, and the customer's recent failure velocity. It must return JSON choosing **one of five menu actions** with a root cause, reasoning, and confidence. The reasoning streams to the dashboard's Agent Brain panel tagged with the model name.
+2. **Batch runs and keyless mode.** The deterministic policy table (`engine.py:DECISION_TABLE`) decides. Batches always use it, for reproducibility and honest measurement; the batch's first audit row discloses this.
 
 The LLM's authority is deliberately narrow:
 
-- **Off-menu proposals are rejected** by a validator and the table takes over — with an audit row saying so (`tests/test_engine.py::test_out_of_menu_llm_proposal_is_rejected`). Bounded actions mean bounded *even for the model*.
-- It never sets amounts, touches money, or bypasses a guardrail — every action it picks still passes all five checks.
-- Domain priors are explicit in the prompt (OTP abandonment = hesitation → call converts best; card problems → UPI pivot; gateway noise → silent retry), and the model may deviate only with a concrete stated reason — which produces genuinely non-hardcoded behavior: a ₹159 order gets a WhatsApp link ("a call is intrusive for this amount"), a ₹1,500 one gets a call, and at 11 PM it reasons about not waking the customer.
+- **Off-menu proposals are rejected** by a validator and the table takes over, with an audit row saying so (`tests/test_engine.py::test_out_of_menu_llm_proposal_is_rejected`). Bounded actions mean bounded *even for the model*.
+- It never sets amounts, touches money, or bypasses a guardrail. Every action it picks still passes all five checks.
+- Domain priors are explicit in the prompt (OTP abandonment = hesitation → call converts best; card problems → UPI pivot; gateway noise → silent retry), and the model may deviate only with a concrete stated reason, which produces genuinely non-hardcoded behavior: a ₹159 order gets a WhatsApp link ("a call is intrusive for this amount"), a ₹1,500 one gets a call, and at 11 PM it reasons about not waking the customer.
 
 | Decline code | Root cause | Intervention |
 |---|---|---|
@@ -164,7 +156,7 @@ The LLM's authority is deliberately narrow:
 
 ## Where we deliberately did *not* use AI
 
-Choosing a model is easy; choosing **not** to is the part that decides whether the thing is trustworthy. Five places where a model was the obvious move and the wrong one:
+Five places where a model was the obvious move and the wrong one:
 
 | Where | What we used instead | Why a model would be worse |
 |---|---|---|
@@ -174,7 +166,7 @@ Choosing a model is easy; choosing **not** to is the part that decides whether t
 | **Fraud detection** | A counter and a 60-second window | "≥5 failures from one source in 60s" is not a judgment call. A classifier here would add false positives to a decision that *suppresses revenue* — the one place we least want creativity. |
 | **Anything touching an amount** | Order data + a fixed ladder | The LLM picks one of five actions. It never sets a price, a discount, or a refund. Money is arithmetic on stored values, not generation. |
 
-Where the model *does* earn its place: reading a messy, context-heavy situation (decline code + amount + hour + bank health + this customer's recent failure velocity) and choosing among bounded options, then explaining itself in a sentence a merchant can read. That is genuine judgment under ambiguity — and it is still checked by a validator before anything happens.
+The model earns its place reading a messy, context-heavy situation (decline code + amount + hour + bank health + this customer's recent failure velocity), choosing among bounded options, and explaining itself in a sentence a merchant can read. A validator still checks the result before anything happens.
 
 ## Guardrails — stopping rules and compliant escalation
 
@@ -192,19 +184,19 @@ Plus bounded calls (15s silence timeout, 5-minute hard cap) and a batch-mode kil
 
 ## The voice agent
 
-"Asha" is a transient Vapi assistant built per call (`voice.py:build_vapi_assistant`) — no dashboard config, fully reproducible from code. Hinglish persona (Vapi's `Naina` Indian voice, slightly slowed), Deepgram `hi` transcription, GPT-4o-mini conversation. Her five tools all execute **server-side through the guardrails**: `apply_discount` (ceiling-checked), `send_upi_link` (WhatsApp mid-call), `schedule_retry`, `opt_out` (instant blacklist + hang up), and `check_payment_status` — so when the customer pays the link mid-call and says "ho gaya", she verifies against the database before celebrating "payment mil gaya!". Final transcripts stream to the dashboard with LLM-classified intent chips (`PRICE_OBJECTION` / `OPT_OUT` / `NO_FUNDS` / `AGREEMENT`); she hangs up on her own when the conversation is done.
+"Asha" is a transient Vapi assistant built per call (`voice.py:build_vapi_assistant`), with no dashboard config and full reproducibility from code. Hinglish persona (Vapi's `Naina` Indian voice, slightly slowed), Deepgram `hi` transcription, GPT-4o-mini conversation. Her five tools all execute **server-side through the guardrails**: `apply_discount` (ceiling-checked), `send_upi_link` (WhatsApp mid-call), `schedule_retry`, `opt_out` (instant blacklist + hang up), and `check_payment_status`, so when the customer pays the link mid-call and says "ho gaya", she verifies against the database before celebrating "payment mil gaya!". Final transcripts stream to the dashboard with LLM-classified intent chips (`PRICE_OBJECTION` / `OPT_OUT` / `NO_FUNDS` / `AGREEMENT`); she hangs up on her own when the conversation is done.
 
 ## Real Razorpay rails
 
-- **Orders API** — every checkout and every recovery page creates a real test-mode order (recovery orders at the *negotiated* price, so the discount is visible in the Razorpay dashboard too).
-- **Real Checkout** — `checkout.js` modal, `payment.failed` client events for sub-second UX, plus the server-verified webhook path.
-- **Webhook signature verification** — HMAC-SHA256 against `RAZORPAY_WEBHOOK_SECRET`; unsigned webhooks are accepted but explicitly audited as unverified.
-- **Reload-safe reconciliation** — if a redirect wipes the page mid-payment, the order is reconciled through Razorpay's order-payments API (dedup by `order_id`).
-- **Error-taxonomy mapping** — Razorpay's `error_code/reason/description/step` are mapped to Revive's decline codes with substring-tolerant matching (`razorpay_gw.py:map_failure`, tested). Test mode only emits generic failure reasons, so the checkout offers a disclosed "treat this decline as X" overlay — transport real, taxonomy overlaid, audited as such.
+- **Orders API:** every checkout and every recovery page creates a real test-mode order (recovery orders at the *negotiated* price, so the discount is visible in the Razorpay dashboard too).
+- **Real Checkout:** `checkout.js` modal, `payment.failed` client events for sub-second UX, plus the server-verified webhook path.
+- **Webhook signature verification:** HMAC-SHA256 against `RAZORPAY_WEBHOOK_SECRET`; unsigned webhooks are accepted but explicitly audited as unverified.
+- **Reload-safe reconciliation:** if a redirect wipes the page mid-payment, the order is reconciled through Razorpay's order-payments API (dedup by `order_id`).
+- **Error-taxonomy mapping:** Razorpay's `error_code/reason/description/step` are mapped to Revive's decline codes with substring-tolerant matching (`razorpay_gw.py:map_failure`, tested). Test mode only emits generic failure reasons, so the checkout offers a disclosed "treat this decline as X" overlay. The transport is real, the taxonomy is overlaid, and both are audited as such.
 
 ## Batch methodology (why the numbers are defensible)
 
-`simulator.py` generates a failure stream with a decline-code distribution modeled on India payment-failure patterns (issuer/bank issues dominate, then customer drop-off, then gateway noise), then injects two adversities mid-batch: an **18-failure HDFC outage cluster** (the agent must hold, not hammer) and a **6-failure card-testing burst** (the agent must suppress, not chase). Recovery is only *attempted* where the engine chose an intervention, and succeeds at honest per-code probabilities (e.g., silent retries on transient gateway errors land ~80%; issuer declines only ~35%). Discounts on voice recoveries follow the negotiation ladder distribution (most calls need none). Everything is seeded — same seed, same rupees.
+`simulator.py` generates a failure stream with a decline-code distribution modeled on India payment-failure patterns (issuer/bank issues dominate, then customer drop-off, then gateway noise), then injects two adversities mid-batch: an **18-failure HDFC outage cluster** (the agent must hold, not hammer) and a **6-failure card-testing burst** (the agent must suppress, not chase). Recovery is only *attempted* where the engine chose an intervention, and succeeds at honest per-code probabilities (e.g., silent retries on transient gateway errors land ~80%; issuer declines only ~35%). Discounts on voice recoveries follow the negotiation ladder distribution (most calls need none). Everything is seeded, so the same seed gives the same rupees.
 
 ## Buildathon bar → where it's met
 
@@ -221,7 +213,7 @@ Plus bounded calls (15s silence timeout, 5-minute hard cap) and a batch-mode kil
 
 ## What broke, and what we did about it
 
-Nine real failures from this build. Each entry is a root cause, not a symptom, and each fix is in the repo.
+Nine real failures from this build, each with its root cause and the fix that shipped.
 
 | # | What we saw | Root cause | What we did |
 |---|---|---|---|
@@ -235,7 +227,7 @@ Nine real failures from this build. Each entry is a root cause, not a symptom, a
 | 8 | CI's frontend type-check would have **failed on the very first push** | `layout.tsx` used `LayoutProps<"/">`, a type Next generates into the git-ignored `.next/`. A fresh CI checkout can never resolve it. | Replaced it with an explicit prop type. Caught **before** pushing, by running the type-check against a no-`.next` tree — exactly what CI sees. |
 | 9 | `demo.py` crashed on Windows with `UnicodeEncodeError` on `₹` | Windows consoles default to cp1252. The docstring promised the run works "on any machine"; it did not. | Forced UTF-8 stdout. The claim and the code now agree. |
 
-Two patterns worth naming. **Every fix removes the failure class, not the symptom** — a permanent URL instead of a restarted tunnel, a provider chain instead of a working provider, deleting the mock path instead of maintaining two. And **the security-flavoured one went the expensive way**: #4 cost a working WhatsApp demo, and we took the loss.
+Most of these fixes remove the failure class rather than the symptom: a permanent URL instead of a restarted tunnel, a provider chain instead of one working provider, a deleted mock path instead of two code paths. Incident 4 went the expensive way and cost a working WhatsApp demo.
 
 ## Free-tier engineering (disclosed, with production paths in-code)
 
@@ -251,7 +243,7 @@ This was built entirely on free tiers as a student project. Each workaround is d
 
 ## Trust & anti-phishing design
 
-An unsolicited payment link is structurally identical to a scam, so the design assumes suspicion: messages quote the exact order ID and amount seconds after the customer's own failed attempt; on calls the link is announced before it arrives; the link opens the merchant's own payment page where the customer initiates payment in their **own** UPI app (no OTP/PIN is ever requested — the opposite of the collect-request scam pattern); and paying from the app remains an alternative path. Production adds the verified-business sender badge.
+An unsolicited payment link is structurally identical to a scam, so the design assumes suspicion: messages quote the exact order ID and amount seconds after the customer's own failed attempt; on calls the link is announced before it arrives; the link opens the merchant's own payment page where the customer initiates payment in their **own** UPI app (no OTP/PIN is ever requested, the opposite of the collect-request scam pattern); and paying from the app remains an alternative path. Production adds the verified-business sender badge.
 
 ## Repository layout
 
@@ -287,34 +279,34 @@ An unsolicited payment link is structurally identical to a scam, so the design a
 
 ## Full-stack setup (optional keys)
 
-Copy `backend/start.example.ps1` → `start.ps1` and fill in what you have — every key is optional and the README's claims are all verifiable without any. For live voice: a free Vapi account, a cloudflared quick tunnel (`cloudflared tunnel --url http://localhost:8000`) as `PUBLIC_URL`, and optionally a free Linphone SIP account to make the demo phone actually ring. For real gateway events: Razorpay test-mode keys (no KYC). For the LLM brain: a free Groq key. Frontend env goes in `frontend/.env.local`: `NEXT_PUBLIC_BACKEND_TUNNEL` (tunnel URL, for phone journeys) and `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (Vapi browser key, required for the in-page WebRTC call).
+Copy `backend/start.example.ps1` → `start.ps1` and fill in what you have. Every key is optional, and the README's claims are all verifiable without any. For live voice: a free Vapi account, a cloudflared quick tunnel (`cloudflared tunnel --url http://localhost:8000`) as `PUBLIC_URL`, and optionally a free Linphone SIP account to make the demo phone actually ring. For real gateway events: Razorpay test-mode keys (no KYC). For the LLM brain: a free Groq key. Frontend env goes in `frontend/.env.local`: `NEXT_PUBLIC_BACKEND_TUNNEL` (tunnel URL, for phone journeys) and `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (Vapi browser key, required for the in-page WebRTC call).
 
 ## Deploying it
 
 The backend needs a host with **WebSocket support** (`/ws` streams the audit trail), which rules out serverless-function platforms for it.
 
-**Backend → Render:** New → Blueprint → point at this repo. `render.yaml` declares the build, start command, health check, and every env var as `sync: false` — prompted once, stored encrypted, never in the repo.
+**Backend → Render:** New → Blueprint → point at this repo. `render.yaml` declares the build, start command, health check, and every env var as `sync: false`, so each one is prompted for once, stored encrypted, and never committed.
 
 ```
 start:   uvicorn app.main:app --host 0.0.0.0 --port $PORT
 health:  /health
 ```
 
-**Frontend → Vercel:** Import → Root Directory = `frontend` (Next.js auto-detected). Set these *before* the first build — `NEXT_PUBLIC_*` values are inlined at build time:
+**Frontend → Vercel:** Import → Root Directory = `frontend` (Next.js auto-detected). Set these *before* the first build, because `NEXT_PUBLIC_*` values are inlined at build time:
 
 ```
 NEXT_PUBLIC_BACKEND_TUNNEL=https://<your-service>.onrender.com
 NEXT_PUBLIC_VAPI_PUBLIC_KEY=<your Vapi browser key>
 ```
 
-Then point Vapi's server URL and the Razorpay webhook at the backend's permanent URL. `GET /health` reports database reachability and **which** integrations are configured — never their values, which is enforced by a test (`tests/test_health.py::test_health_never_leaks_credential_values`).
+Then point Vapi's server URL and the Razorpay webhook at the backend's permanent URL. `GET /health` reports database reachability and **which** integrations are configured, never their values. A test enforces that (`tests/test_health.py::test_health_never_leaks_credential_values`).
 
-> On a free tier the backend sleeps after ~15 minutes idle and cold-starts in under a minute; warm it before a demo. SQLite lives on ephemeral disk, so state resets on deploy — harmless here, since the headline numbers come from `demo.py`, which builds its own isolated database.
+> On a free tier the backend sleeps after ~15 minutes idle and cold-starts in under a minute; warm it before a demo. SQLite lives on ephemeral disk, so state resets on deploy. That is harmless here, since the headline numbers come from `demo.py`, which builds its own isolated database.
 
 ## Honest limitations
 
 - Batch metrics use the deterministic policy table; the LLM routes live traffic only, so **LLM lift over the table is unmeasured** (an A/B batch is the obvious next experiment).
-- Recovery success probabilities in the simulator are modeled, not learned from production data — the yield number demonstrates the measurement harness, not a market claim.
+- Recovery success probabilities in the simulator are modeled, not learned from production data; the yield number demonstrates the measurement harness, not a market claim.
 - Scheduled retries are recorded intents; a production system needs a real scheduler executing them against stored tokens/mandates.
 - Test mode can't exercise live UPI collect or mandate debits; the subscription-save flow simulates the mandate re-authorization.
 - Single-merchant, single-process deployment; production needs multi-tenancy, queueing, and idempotent webhook consumption at scale.
@@ -322,7 +314,5 @@ Then point Vapi's server URL and the Razorpay webhook at the backend's permanent
 ## Roadmap to production
 
 Razorpay downtime-webhook-driven bank holds → real retry scheduler with mandate-rule compliance (pre-debit notification windows, RBI caps) → verified WABA + approved templates → learned per-code recovery probabilities from live outcomes → A/B: policy table vs LLM routing on live traffic → promise-to-pay tracking closing the loop.
-
----
 
 MIT © 2026 Pari Singhal · built for the Razorpay AI Buildathon (Track 03)
