@@ -1,0 +1,20 @@
+{
+  "n": 500,
+  "seed": 42,
+  "at_risk_paise": 194191600,
+  "recovered_paise": 96069525,
+  "recovered_count": 250,
+  "yield_pct": 50.0,
+  "suppressed_fraud": {
+    "count": 2,
+    "paise": 20000
+  },
+  "honest_losses": {
+    "count": 244,
+    "paise": 97086700
+  },
+  "outage_handled": {
+    "bank": "HDFC",
+    "held_then_released": 18
+  }
+}
