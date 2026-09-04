@@ -1,0 +1,12 @@
+# Line endings: LF in the repository, native in the working tree. Keeps diffs
+# clean when the same repo is edited on Windows and built on Linux CI.
+* text=auto
+
+# Windows-only launcher — must stay CRLF wherever it is checked out.
+*.ps1 text eol=crlf
+
+# Never normalize binaries.
+*.ico binary
+*.png binary
+*.jpg binary
+*.woff2 binary

@@ -1,0 +1,45 @@
+# Render Blueprint — one-click deploy of the Revive backend.
+#   render.com → New → Blueprint → point at this repo.
+# Secrets are NEVER stored here: every key is `sync: false`, meaning Render
+# prompts for it once and keeps it in its own encrypted store.
+services:
+  - type: web
+    name: revive-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # Render injects $PORT and requires binding 0.0.0.0 (the local launcher uses :8000).
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      # Public URL of THIS service — Vapi calls back here for tools and transcripts.
+      - key: PUBLIC_URL
+        sync: false
+      # Public URL of the storefront (Vercel), so links inside messages resolve.
+      - key: FRONTEND_URL
+        sync: false
+      # All optional: with none of these the system still runs end-to-end on the
+      # deterministic policy table, simulated checkout, and audit trail.
+      - key: GROQ_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: VAPI_API_KEY
+        sync: false
+      - key: VAPI_SIP_NUMBER_ID
+        sync: false
+      - key: CUSTOMER_SIP_URI
+        sync: false
+      - key: META_WA_TOKEN
+        sync: false
+      - key: META_WA_PHONE_ID
+        sync: false
+      - key: META_WA_TO
+        sync: false

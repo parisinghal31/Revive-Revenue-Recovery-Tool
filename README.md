@@ -2,6 +2,11 @@
 
 **Razorpay AI Buildathon · Track 03 (AI Revenue Recovery)** · by Pari Singhal
 
+[![CI](https://github.com/parisinghal31/Revive-Revenue-Recovery-Tool/actions/workflows/ci.yml/badge.svg)](https://github.com/parisinghal31/Revive-Revenue-Recovery-Tool/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black?style=flat-square)](LICENSE)
+![API keys needed to verify every claim: zero](https://img.shields.io/badge/API%20keys%20to%20verify-zero-2ea44f?style=flat-square)
+![Deterministic](https://img.shields.io/badge/headline%20%E2%82%B9-reproducible%20to%20the%20rupee-2ea44f?style=flat-square)
+
 Razorpay's native retry is time-based — T+1/T+2/T+3 — regardless of **why** a payment failed. Retrying an expired card tomorrow is always wasted; calling a hesitant customer works. **Revive diagnoses the decline code first**, picks a bounded intervention (Hinglish voice call, WhatsApp UPI link, smart-timed retry, bank-outage hold, subscription save), runs it through five server-side guardrails, and measures the rupees it brings back — with every decision, check, and action written to an audit trail *before* it executes.
 
 ```
@@ -10,6 +15,17 @@ payment.failed ──► DECISION LAYER ──► GUARDRAILS ──► BOUNDED A
                    root cause →        audited BEFORE  retry / hold /      audited, and
                    intervention        any action      mandate-save        reproducible
 ```
+
+---
+
+## Judged on four things — here's each one, and where to check it
+
+| Criterion | The one-line answer | Verify |
+|---|---|---|
+| **Problem taste** | Razorpay's native retry is time-based (T+1/T+2/T+3) and throws away the only signal that matters: **why** the payment failed. Retrying an expired card tomorrow is arithmetic, not recovery. Revive routes on the decline code. | [The decision layer](#the-decision-layer-llm-proposes-rules-dispose) |
+| **Build quality** | 20 tests, green CI on every push, a headline number that reproduces to the rupee with **zero API keys**, a `/health` probe, and a one-click deploy blueprint. | [Verify in five minutes](#verify-this-repo-in-five-minutes-for-reviewers) |
+| **AI judgment** | "LLM proposes, rules dispose" — a bounded 5-action menu with a validator that rejects off-menu answers, **plus five places we deliberately refused to use a model**. | [Where we did *not* use AI](#where-we-deliberately-did-not-use-ai) |
+| **Failure recovery** | Both kinds: what the **system** does when a dependency dies, and what **we** did when the build broke — nine real incidents with root causes. | [What broke](#what-broke-and-what-we-did-about-it) |
 
 ---
 
@@ -35,7 +51,7 @@ The committed [`results/batch_report.json`](results/batch_report.json) was produ
 ## Verify this repo in five minutes (for reviewers)
 
 ```bash
-# 1. Guardrails, engine routing, LLM-boundary, batch honesty — 18 tests
+# 1. Guardrails, engine routing, LLM-boundary, batch honesty, health probe — 20 tests
 cd backend && pip install -r requirements-dev.txt && python -m pytest tests -q
 
 # 2. The headline numbers, reproducibly, keyless
@@ -48,6 +64,24 @@ cd ../frontend && npm install && npm run dev   # storefront http://localhost:300
 ```
 
 Everything degrades gracefully without keys: no LLM key → deterministic policy table (audited as such); no Razorpay key → simulated card picker; no Vapi/WhatsApp keys → decisions and audit rows still flow. CI (`.github/workflows/ci.yml`) runs the tests and the reproducible batch on every push.
+
+---
+
+## Tools & tech stack
+
+Every choice below is either free-tier or self-hosted, and each one is load-bearing — nothing is in this list for decoration.
+
+| Layer | Stack | Why this one |
+|---|---|---|
+| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js%2016-000000?style=for-the-badge&logo=nextdotjs&logoColor=white) ![React](https://img.shields.io/badge/React%2019-20232A?style=for-the-badge&logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white) | App Router gives server-rendered recovery pages that open instantly from a WhatsApp link on a cold phone browser. |
+| **Styling & motion** | ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) ![Framer Motion](https://img.shields.io/badge/Framer%20Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white) ![Lucide](https://img.shields.io/badge/Lucide-F56565?style=for-the-badge&logo=lucide&logoColor=white) | A merchant dashboard is watched for hours; motion carries state changes without a page refresh. |
+| **Backend** | ![Python](https://img.shields.io/badge/Python%203.11-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![Uvicorn](https://img.shields.io/badge/Uvicorn-2F9E44?style=for-the-badge) | Async web framework with native WebSockets — the audit trail streams live to the dashboard on the same process. |
+| **Storage** | ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white) | One file, zero external services, trivially isolatable per test and per batch (`REVIVE_DB_PATH`). The audit trail is the product; a heavyweight DB would add ops burden without adding truth. |
+| **Decision LLM** | ![Groq](https://img.shields.io/badge/Groq-F55036?style=for-the-badge) ![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white) | `groq/gpt-oss-120b` for sub-second routing decisions; `gemini-2.0-flash` as a drop-in alternate. Both free-tier, both behind one OpenAI-compatible call. |
+| **Voice** | ![Vapi](https://img.shields.io/badge/Vapi-12A594?style=for-the-badge) ![OpenAI](https://img.shields.io/badge/GPT--4o--mini-412991?style=for-the-badge) ![Deepgram](https://img.shields.io/badge/Deepgram%20nova--2-13EF93?style=for-the-badge&logo=deepgram&logoColor=black) | Vapi orchestrates the call and calls **our** tools server-side; `Naina` voice + Hindi transcription make Hinglish actually land. |
+| **Payments** | ![Razorpay](https://img.shields.io/badge/Razorpay-0C2451?style=for-the-badge&logo=razorpay&logoColor=white) | Real test-mode Orders, Checkout, webhooks with HMAC verification, and order-payments reconciliation. |
+| **Messaging** | ![WhatsApp](https://img.shields.io/badge/WhatsApp%20Cloud%20API-25D366?style=for-the-badge&logo=whatsapp&logoColor=white) ![Twilio](https://img.shields.io/badge/Twilio-F22F46?style=for-the-badge&logo=twilio&logoColor=white) | A provider chain, not a dependency — see [what broke](#what-broke-and-what-we-did-about-it). |
+| **Delivery** | ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white) ![Render](https://img.shields.io/badge/Render-46E3B7?style=for-the-badge&logo=render&logoColor=black) ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white) | CI runs the tests *and* the reproducible batch on every push; `render.yaml` deploys the backend with no secrets in the repo. |
 
 ---
 
@@ -128,6 +162,20 @@ The LLM's authority is deliberately narrow:
 | `ISSUER_DOWN` | Bank outage | **Hold ALL retries for that bank**; release as a batch on recovery, then send UPI links |
 | `MANDATE_CANCELLED` | Subscription churn | Save-outreach with pause→downgrade ladder + autopay restart link → MRR saved |
 
+## Where we deliberately did *not* use AI
+
+Choosing a model is easy; choosing **not** to is the part that decides whether the thing is trustworthy. Five places where a model was the obvious move and the wrong one:
+
+| Where | What we used instead | Why a model would be worse |
+|---|---|---|
+| **The five guardrails** | Plain Python `if` statements (`guardrails.py`) | A control you can argue with is not a control. The discount ceiling is `if discount > 0.10: block` — no prompt, jailbreak, or persuasive customer negotiates with an if-statement. Every check is unit-tested; a model's would be sampled. |
+| **The measurement path** | The deterministic policy table (`engine.py:DECISION_TABLE`) | Put an LLM in the batch and the headline ₹ stops being reproducible — and an unfalsifiable number is worth nothing to a judge. Batches disclose in their first audit row that the table decided. |
+| **Decline code → root cause** | A lookup table | It is a **finite, documented, unambiguous** taxonomy. Asking a model to re-derive `CARD_EXPIRED → retry is wasted` on every request buys latency, cost, and variance in exchange for zero information. |
+| **Fraud detection** | A counter and a 60-second window | "≥5 failures from one source in 60s" is not a judgment call. A classifier here would add false positives to a decision that *suppresses revenue* — the one place we least want creativity. |
+| **Anything touching an amount** | Order data + a fixed ladder | The LLM picks one of five actions. It never sets a price, a discount, or a refund. Money is arithmetic on stored values, not generation. |
+
+Where the model *does* earn its place: reading a messy, context-heavy situation (decline code + amount + hour + bank health + this customer's recent failure velocity) and choosing among bounded options, then explaining itself in a sentence a merchant can read. That is genuine judgment under ambiguity — and it is still checked by a validator before anything happens.
+
 ## Guardrails — stopping rules and compliant escalation
 
 Every check runs **before** the action and writes an audit row whether it passes or blocks (`backend/app/guardrails.py`, each verified in `tests/test_guardrails.py`):
@@ -171,6 +219,24 @@ Plus bounded calls (15s silence timeout, 5-minute hard cap) and a batch-mode kil
 | **Graceful failure handling** | Issuer outage → hold & batch-release; LLM timeout → policy table ("graceful degradation" audit row); WhatsApp/voice provider failures audited, flow continues |
 | **Uses Razorpay rails** | Orders, Checkout, webhooks + signatures, order-payments reconciliation, error taxonomy, subscriptions story (mandate save → MRR) |
 
+## What broke, and what we did about it
+
+Nine real failures from this build. Each entry is a root cause, not a symptom, and each fix is in the repo.
+
+| # | What we saw | Root cause | What we did |
+|---|---|---|---|
+| 1 | Customer accepted a 10% discount on a live call and **every tool silently failed** | The cloudflared quick tunnel had died, so Vapi's cloud could not reach `/vapi/tools`. Tunnels died **three times** during the build. | Restarted and re-pointed `PUBLIC_URL` — then removed the failure class entirely by shipping `render.yaml`, so the backend gets a permanent URL instead of a disposable one. |
+| 2 | Free Vapi number **refused to dial +91** | Free telephony blocks international dialling. | Probed the API until a free **SIP number** worked, then dialled SIP→SIP into a free Linphone account. The demo phone genuinely rings, at ₹0. Production is a one-line swap to a paid imported number. |
+| 3 | Twilio WhatsApp returned **error 21654** | Sandbox senders are template-only and the 24-hour session had expired — a dead end, not a bug. | Stopped depending on any single provider: built a chain (Meta Cloud API → Green API → CallMeBot → Twilio) where the first configured one wins and every failure is audited. |
+| 4 | A bridge offered instant WhatsApp delivery — **if we linked the owner's account by QR** | It worked. It also meant handing a third party a live WhatsApp session. | **Rejected it and deleted the provider**, despite it being the fastest path to a working demo. Account-takeover surface is not a demo shortcut. |
+| 5 | The LLM sent a WhatsApp link for a **₹1,198 OTP abandonment**, where a call converts far better | The prompt stated the action menu but no **channel priors** — the model had no basis to prefer voice at higher amounts. | Added explicit priors (hesitation codes → call above ~₹500; card codes → link; gateway noise → silent retry) plus a rule that deviating requires a stated reason. Re-ran: 3/3 routed to `voice_call`. |
+| 6 | Customer paid mid-call, said "ho gaya" — **Asha had no way to check** | The agent had five *write* tools and no *read* tool. | Added `check_payment_status`, plus a prompt rule to verify before celebrating. Both branches (paid / not yet) verified end-to-end. |
+| 7 | Real calls **never streamed transcripts** | The transcript pipeline had only ever been wired to mock calls — a demo feature masquerading as a real one. | Wired Vapi `serverMessages` (transcript / status-update / tool-calls) into the real handler and **deleted the entire mock-call machinery** rather than leave two code paths. |
+| 8 | CI's frontend type-check would have **failed on the very first push** | `layout.tsx` used `LayoutProps<"/">`, a type Next generates into the git-ignored `.next/`. A fresh CI checkout can never resolve it. | Replaced it with an explicit prop type. Caught **before** pushing, by running the type-check against a no-`.next` tree — exactly what CI sees. |
+| 9 | `demo.py` crashed on Windows with `UnicodeEncodeError` on `₹` | Windows consoles default to cp1252. The docstring promised the run works "on any machine"; it did not. | Forced UTF-8 stdout. The claim and the code now agree. |
+
+Two patterns worth naming. **Every fix removes the failure class, not the symptom** — a permanent URL instead of a restarted tunnel, a provider chain instead of a working provider, deleting the mock path instead of maintaining two. And **the security-flavoured one went the expensive way**: #4 cost a working WhatsApp demo, and we took the loss.
+
 ## Free-tier engineering (disclosed, with production paths in-code)
 
 This was built entirely on free tiers as a student project. Each workaround is disclosed in the audit rows it writes, and the production path is documented as commented reference code beside it:
@@ -202,7 +268,7 @@ An unsolicited payment link is structurally identical to a scam, so the design a
 │   │   ├── simulator.py       # measurement harness
 │   │   ├── db.py              # SQLite schema + helpers
 │   │   └── events.py          # audit writer + WebSocket hub + metrics
-│   ├── tests/                 # 18 tests: guardrails, routing, LLM boundary, batch honesty
+│   ├── tests/                 # 20 tests: guardrails, routing, LLM boundary, batch honesty, health
 │   ├── demo.py                # one-command reproducible proof run
 │   ├── requirements.txt / requirements-dev.txt
 │   └── start.example.ps1      # env template (no secrets in repo)
@@ -214,12 +280,36 @@ An unsolicited payment link is structurally identical to a scam, so the design a
 │       └── lib/               # api client + ws, menu data, utils
 ├── results/batch_report.json  # committed evidence for the headline numbers
 ├── .github/workflows/ci.yml   # tests + reproducible batch + frontend type-check
+├── render.yaml                # one-click backend deploy; every secret is `sync: false`
+├── .gitattributes             # LF in repo, CRLF for .ps1 — clean cross-platform diffs
 └── LICENSE                    # MIT
 ```
 
 ## Full-stack setup (optional keys)
 
 Copy `backend/start.example.ps1` → `start.ps1` and fill in what you have — every key is optional and the README's claims are all verifiable without any. For live voice: a free Vapi account, a cloudflared quick tunnel (`cloudflared tunnel --url http://localhost:8000`) as `PUBLIC_URL`, and optionally a free Linphone SIP account to make the demo phone actually ring. For real gateway events: Razorpay test-mode keys (no KYC). For the LLM brain: a free Groq key. Frontend env goes in `frontend/.env.local`: `NEXT_PUBLIC_BACKEND_TUNNEL` (tunnel URL, for phone journeys) and `NEXT_PUBLIC_VAPI_PUBLIC_KEY` (Vapi browser key, required for the in-page WebRTC call).
+
+## Deploying it
+
+The backend needs a host with **WebSocket support** (`/ws` streams the audit trail), which rules out serverless-function platforms for it.
+
+**Backend → Render:** New → Blueprint → point at this repo. `render.yaml` declares the build, start command, health check, and every env var as `sync: false` — prompted once, stored encrypted, never in the repo.
+
+```
+start:   uvicorn app.main:app --host 0.0.0.0 --port $PORT
+health:  /health
+```
+
+**Frontend → Vercel:** Import → Root Directory = `frontend` (Next.js auto-detected). Set these *before* the first build — `NEXT_PUBLIC_*` values are inlined at build time:
+
+```
+NEXT_PUBLIC_BACKEND_TUNNEL=https://<your-service>.onrender.com
+NEXT_PUBLIC_VAPI_PUBLIC_KEY=<your Vapi browser key>
+```
+
+Then point Vapi's server URL and the Razorpay webhook at the backend's permanent URL. `GET /health` reports database reachability and **which** integrations are configured — never their values, which is enforced by a test (`tests/test_health.py::test_health_never_leaks_credential_values`).
+
+> On a free tier the backend sleeps after ~15 minutes idle and cold-starts in under a minute; warm it before a demo. SQLite lives on ephemeral disk, so state resets on deploy — harmless here, since the headline numbers come from `demo.py`, which builds its own isolated database.
 
 ## Honest limitations
 

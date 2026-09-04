@@ -4,16 +4,20 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 import asyncio
 import json
+import logging
+import os
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import db, engine, guardrails, razorpay_gw, simulator, voice
 from .events import hub, audit, metrics, push_metrics
 
+
+log = logging.getLogger("revive")
 
 QUIET_TICK_S = 60
 
@@ -30,8 +34,13 @@ async def _quiet_queue_ticker():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     hub.register_loop(asyncio.get_running_loop())
     db.conn()  # ensure schema
+    log.info("Revive online — db=%s", db.DB_PATH)
     audit("system", "Revive engine online — guardrails armed", outcome="INFO")
     ticker = asyncio.create_task(_quiet_queue_ticker())
     engine.release_quiet_queue()  # catch calls parked while the server was down
@@ -47,6 +56,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health():
+    """Liveness + readiness probe for the hosting platform.
+
+    Reports WHICH optional integrations are configured, never their values. On a
+    hosted box the audit trail lives in ephemeral SQLite, so this is the fastest
+    way to see why a channel went quiet after a deploy.
+    """
+    try:
+        db.conn().execute("SELECT 1")
+    except Exception as e:
+        log.exception("health: database unreachable")
+        raise HTTPException(status_code=503, detail=f"database unreachable: {e}")
+    return {
+        "status": "ok",
+        "database": "ok",
+        "integrations": {
+            "llm": bool(os.environ.get("GROQ_API_KEY") or os.environ.get("GEMINI_API_KEY")),
+            "razorpay": bool(os.environ.get("RAZORPAY_KEY_ID")),
+            "vapi": bool(os.environ.get("VAPI_API_KEY")),
+            "whatsapp": bool(os.environ.get("META_WA_TOKEN") or os.environ.get("TWILIO_SID")
+                             or os.environ.get("CALLMEBOT_APIKEY")),
+        },
+    }
 
 
 # ---------- realtime ----------

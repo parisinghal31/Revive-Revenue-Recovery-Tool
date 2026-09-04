@@ -12,6 +12,7 @@ Providers (OpenAI-compatible chat endpoints), first key found wins:
 No key -> callers fall back to the static policy table (audited as such).
 """
 import json
+import logging
 import os
 import urllib.request
 
@@ -59,7 +60,13 @@ def _chat(system: str, user: str, max_tokens: int = 400) -> str | None:
             out = json.loads(r.read())
         return out["choices"][0]["message"]["content"]
     except Exception:
+        # Never fatal: the caller falls back to the deterministic policy table and
+        # audits it. Logged so a hosted deploy can tell "LLM down" from "LLM off".
+        log.warning("LLM call failed; falling back to the policy table", exc_info=True)
         return None
+
+
+log = logging.getLogger("revive.llm")
 
 
 DECIDE_SYSTEM = """You are the decision brain of Revive, an AI revenue-recovery agent for Indian payment failures on Razorpay.
