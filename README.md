@@ -11,6 +11,19 @@
 
 *[Watch the demo on Vimeo](https://vimeo.com/1223978353) (5:35).*
 
+## Live demo
+
+**Storefront and dashboard:** https://revive-revenue-recovery-tool.vercel.app
+**Backend health:** https://revive-backend-mtjs.onrender.com/health
+
+The hosted instance runs **keyless on purpose**. No LLM, Razorpay, Vapi or WhatsApp keys are set on it, so the free-tier credits stay available for the judged demo rather than being spent by passing traffic. The live site therefore routes with the deterministic policy table and uses the simulated checkout, with no outbound voice or WhatsApp.
+
+Everything else on it is real: the five guardrails, the audit row written *before* every action, the live WebSocket stream, the bank-outage hold, and the recorded rupees. `GET /health` reports exactly which integrations are off.
+
+To see the LLM routing live traffic and Asha running a call, watch the video above, or run it locally with your own free keys ([Full-stack setup](#full-stack-setup-optional-keys)). The headline numbers need no keys at all and reproduce anywhere.
+
+> Render's free tier sleeps after about 15 minutes idle, so the first request can take up to a minute to wake it.
+
 Razorpay's native retry is time-based (T+1/T+2/T+3), regardless of **why** a payment failed. Retrying an expired card tomorrow is always wasted; calling a hesitant customer works. **Revive diagnoses the decline code first**, picks a bounded intervention (Hinglish voice call, WhatsApp UPI link, smart-timed retry, bank-outage hold, subscription save), runs it through five server-side guardrails, and measures the rupees it brings back. Every decision, check, and action is written to an audit trail *before* it executes.
 
 ```
